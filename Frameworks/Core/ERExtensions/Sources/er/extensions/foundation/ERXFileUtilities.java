@@ -25,6 +25,7 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.Writer;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.channels.FileChannel;
@@ -38,6 +39,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.lang.CharEncoding;
 import org.apache.log4j.Logger;
 
 import com.webobjects.appserver.WOApplication;
@@ -69,7 +71,7 @@ public class ERXFileUtilities {
 
     private static Charset charset = null;
 
-    static { setDefaultCharset("UTF-8"); }
+    static { setDefaultCharset(CharEncoding.UTF_8); }
 
     //  ===========================================================================
     //  Static Methods
@@ -351,7 +353,7 @@ public class ERXFileUtilities {
      * @throws IOException if things go wrong
      */
     public static void writeInputStreamToFile(InputStream stream, File file) throws IOException {
-    	FileOutputStream out;
+    	FileOutputStream out = null;
     	try {
 	        if (file == null) throw new IllegalArgumentException("Attempting to write to a null file!");
 	        File parent = file.getParentFile();
@@ -360,22 +362,26 @@ public class ERXFileUtilities {
                         throw new RuntimeException("Cannot create parent directory for file");
 	        }
 	        out = new FileOutputStream(file);
-    	}
-    	catch (IOException e) {
+	        ERXFileUtilities.writeInputStreamToOutputStream(stream, true, out, true);
+    	} finally {
     		stream.close();
-    		throw e;
+    		if (out != null) {
+    			out.close();
+    		}
     	}
-    	catch (RuntimeException e) {
-    		stream.close();
-    		throw e;
-    	}
-        ERXFileUtilities.writeInputStreamToOutputStream(stream, true, out, true);
     }
     
     public static void writeInputStreamToGZippedFile(InputStream stream, File file) throws IOException {
     	if (file == null) throw new IllegalArgumentException("Attempting to write to a null file!");
-     	FileOutputStream out = new FileOutputStream(file);
-     	ERXFileUtilities.writeInputStreamToOutputStream(stream, false, new GZIPOutputStream(out), true);
+    	GZIPOutputStream out = null;
+     	try {
+     		out = new GZIPOutputStream(new FileOutputStream(file));
+     		ERXFileUtilities.writeInputStreamToOutputStream(stream, false, out, true);
+     	} finally {
+     		if (out != null) {
+     			out.close();
+     		}
+     	}
     }
  	
     /**
@@ -697,7 +703,7 @@ public class ERXFileUtilities {
         if(fileName != null) {
             try {
                 url = new URL("file://" + fileName);
-            } catch (java.net.MalformedURLException ex) {
+            } catch(MalformedURLException ex) {
                 throw new NSForwardException(ex);
             }
         }
@@ -786,10 +792,10 @@ public class ERXFileUtilities {
             try {
                 // BUGFIX: we didnt use an encoding before, so java tried to guess the encoding. Now some Localizable.strings plists
                 // are encoded in MacRoman whereas others are UTF-16.
-                plist = readPropertyListFromFileInFramework( fileName, aFrameWorkName, languageList, "UTF-16" );
+                plist = readPropertyListFromFileInFramework(fileName, aFrameWorkName, languageList, CharEncoding.UTF_16);
             } catch (IllegalArgumentException e1) {
                 // OK, whatever it is, try to parse it!
-                plist = readPropertyListFromFileInFramework( fileName, aFrameWorkName, languageList, "UTF-8" );
+                plist = readPropertyListFromFileInFramework(fileName, aFrameWorkName, languageList, CharEncoding.UTF_8);
             }
         }
         return plist;
@@ -867,7 +873,7 @@ public class ERXFileUtilities {
     }
 
     /**
-        * Deletes a given directory in a recursive fashion.
+     * Deletes a given directory in a recursive fashion.
      * @param directory to be deleted
      * @return if the directory deleted successfully
      */
@@ -912,14 +918,14 @@ public class ERXFileUtilities {
     }
     
     /**
-        * Creates a symlink for a given file. Note this only works on
+     * Creates a symlink for a given file. Note this only works on
      * civilized OSs which support symbolic linking.
      * @param source to create the link to
      * @param destination file to create the link to
      * @param symbolic determines if a symlink should be created
      * @param allowUnlink determines if the symlink is a hardlink which allows unlinking
      * @param followSymbolicLinks If the destination is a symbolic link, follow it
-     * @throws IOException 
+     * @throws IOException if the link could not be created
      */
     public static void linkFiles(File source, File destination,
                                  boolean symbolic,
@@ -1296,12 +1302,18 @@ public class ERXFileUtilities {
                     log.debug("created directory "+d.getAbsolutePath());
                 }
             } else {
-                InputStream is = zipFile.getInputStream(ze);
-                writeInputStreamToFile(is, new File(absolutePath, name));
-                if (log.isDebugEnabled()) {
-                    log.debug("unzipped file "+ze.getName()+" into "+(absolutePath + name));
+                InputStream is = null;
+                try {
+                	is = zipFile.getInputStream(ze);
+	                writeInputStreamToFile(is, new File(absolutePath, name));
+	                if (log.isDebugEnabled()) {
+	                    log.debug("unzipped file "+ze.getName()+" into "+(absolutePath + name));
+	                }
+                } finally {
+                	if (is != null) {
+                		is.close();
+                	}
                 }
-                is.close();
             }
         }
 
@@ -1375,9 +1387,10 @@ public class ERXFileUtilities {
                 }
                 origin.close();
             }
-            zout.close();
         } catch(Exception e) {
             e.printStackTrace();
+        } finally {
+        	zout.close();
         }
         
         if (deleteOriginal) {
@@ -1395,7 +1408,7 @@ public class ERXFileUtilities {
      *
      * @param file the file to sum
      * @return the MD5 sum of the bytes in file
-     * @exception IOException
+     * @exception IOException if file could not be read
      */
     public static byte[] md5(File file) throws IOException {
         FileInputStream fis = new FileInputStream(file);
@@ -1412,7 +1425,7 @@ public class ERXFileUtilities {
      *
      * @param in the input stream to sum
      * @return the MD5 sum of the bytes in file
-     * @exception IOException
+     * @exception IOException if the input stream could not be read
      */
     public static byte[] md5(InputStream in) throws IOException {
         try {
@@ -1434,7 +1447,7 @@ public class ERXFileUtilities {
      *
      * @param file the file to sum
      * @return the hex encoded MD5 sum of the bytes in file
-     * @exception IOException
+     * @exception IOException if the file could not be read
      */
     public static String md5Hex(File file) throws IOException {
         return ERXStringUtilities.byteArrayToHexString(md5(file));
@@ -1445,7 +1458,7 @@ public class ERXFileUtilities {
      *
      * @param in the input stream to sum
      * @return the hex encoded MD5 sum of the bytes in file
-     * @exception IOException
+     * @exception IOException if the input stream could not be read
      */
     public static String md5Hex(InputStream in) throws IOException {
         return ERXStringUtilities.byteArrayToHexString(md5(in));
@@ -1579,7 +1592,8 @@ public class ERXFileUtilities {
     }
 
     
-    /** Lists all files in the specified directory, if desired recursively.
+    /**
+     * Lists all files in the specified directory, if desired recursively.
      *  
      * @param baseDir the dir from which to list the child files
      * @param recursive if <code>true</code> this method works recursively
@@ -1605,15 +1619,15 @@ public class ERXFileUtilities {
         return files;
     }
 
-    /** moves a file from one location to another one. This works different
+    /**
+     * Moves a file from one location to another one. This works different
      * than java.io.File.renameTo as renameTo does not work across partitions
      * 
-     * @param source
-     * @param destination
-     * @throws IOException
-     * @throws FileNotFoundException
+     * @param source the file to move
+     * @param destination the destination to move the source to
+     * @throws IOException if things go wrong
      */
-    public static void renameTo(File source, File destination) throws FileNotFoundException, IOException {
+    public static void renameTo(File source, File destination) throws IOException {
         if (!source.renameTo(destination)) {
             ERXFileUtilities.copyFileToFile(source, destination, true, true);
         }

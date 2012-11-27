@@ -20,6 +20,7 @@ import java.util.Random;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.lang.ObjectUtils;
 import org.apache.log4j.Logger;
 
 import com.webobjects.appserver.WOApplication;
@@ -193,7 +194,7 @@ public class ERXExtensions extends ERXFrameworkPrincipal {
         	ERXSystem.updateProperties();
  
     		// AK: enable this when we're ready
-        	// WOEncodingDetector.sharedInstance().setFallbackEncoding("UTF-8");
+        	// WOEncodingDetector.sharedInstance().setFallbackEncoding(CharEncoding.UTF_8);
         	
         	// GN: configure logging with optional custom subclass of ERXLogger
         	String className = ERXProperties.stringForKey("er.extensions.erxloggerclass"); 
@@ -681,30 +682,34 @@ public class ERXExtensions extends ERXFrameworkPrincipal {
 
     /**
      * A safe comparison method that first checks to see
-     * if either of the objects are null before comparing
+     * if either of the objects are <code>null</code> before comparing
      * them with the <code>equals</code> method.<br/>
      * <br/>
-     * Note that if both objects are null then they will
+     * Note that if both objects are <code>null</code> then they will
      * be considered equal.
      * @param v1 first object
      * @param v2 second object
-     * @return true if they are equal, false if not
+     * @return <code>true</code> if they are equal, <code>false</code> if not
+     * @deprecated use {@link ObjectUtils#equals(Object, Object)} instead
      */
+    @Deprecated
     public static boolean safeEquals(Object v1, Object v2) {
         return v1==v2 || (v1!=null && v2!=null && v1.equals(v2));
     }
 
     /**
      * A safe different comparison method that first checks to see
-     * if either of the objects are null before comparing
+     * if either of the objects are <code>null</code> before comparing
      * them with the <code>equals</code> method.<br/>
      * <br/>
-     * Note that if both objects are null then they will
+     * Note that if both objects are <code>null</code> then they will
      * be considered equal.
      * @param v1 first object
      * @param v2 second object
-     * @return treu if they are not equal, false if they are
+     * @return <code>true</code> if they are not equal, <code>false</code> if they are
+     * @deprecated user {@link ObjectUtils#notEqual(Object, Object)} instead
      */
+    @Deprecated
     public static boolean safeDifferent(Object v1, Object v2) {
         return v1 != v2 && (v1 == null || v2 == null || !v1.equals(v2));
     }
